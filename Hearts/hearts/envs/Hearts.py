@@ -80,48 +80,31 @@ class HeartsEnv(gym.Env):
         return {}
     
     def legal_actions(self):
-        legal_actions = np.zeros(13)
+        legal_actions = []
         current_player = self.players[self.current_player_num]
         can_follow_suit = False
         for i, card in enumerate(current_player.hand):
             card_num, card_suit = format_card(card)
             if card_suit == self.current_trick_suit:
-                legal_actions[i] = 1
+                legal_actions.append(i)
                 can_follow_suit = True
         if not can_follow_suit:
-            legal_actions = np.ones(13)
+            for i, card in enumerate(current_player.hand):
+                if card != -1:
+                    legal_actions.append(i)
 
         return legal_actions
-
-            
 
     def reset(self, seed=None):
         # following line to seed self.np_random
         super().reset(seed=seed)
 
-        # reset and shuffle the deck
-        self.deck = Deck()
-        self.deck.shuffle()
-
-        # reset remaining card tracker
-        self.remaining_cards = [x for x in range(52)]
-        
         for player in self.players:
             # clear player hand and score
             player.reset()
 
-            # deal player new hand
-            player.hand = self.deck.draw(13)
-
-            # if player has the 2 of clubs
-            if 13 in player.hand:
-                # set current player to the left of player with 2 of clubs
-                self.current_player_num = (player.id + 1) % 4
-                # add 2 of clubs to current trick and discard from player's hand
-                self.current_trick[player.id] = 13
-                player.discard(13)
-
-                self.current_trick_suit = "c"
+        # reset the round
+        self.reset_round()
 
         # return observation and info
         observation = self._get_obs()
@@ -136,56 +119,75 @@ class HeartsEnv(gym.Env):
         terminated = False
         reward = [0] * self.n_players
 
-        if self.legal_actions[action] == 0:
-            # handle illegal actions
-            pass
+        # if self.legal_actions[action] == 0:
+        #     # handle illegal actions
+        #     pass
+        # else:
+        player_id = self.current_player_num
+        
+        # add card to trick
+        self.current_trick[player_id] = action
+
+        # remove card from player's hand
+        self.players[player_id].discard(action)
+        # remove card from remaining cards list
+        self.remaining_cards.remove(action)
+
+        # handle trick start
+        if player_id == self.trick_start_pos:
+            card_num, card_suit = format_card(action)
+            self.current_trick_suit = card_suit
+        
+        # handle trick end
+        if (self.trick_start_pos + 1) % self.n_players == self.current_player_num:
+            # check who won the trick and update their score
+            trick_score = 0
+            max_card = 0
+            winner = None
+            for player_id, card in enumerate(self.current_trick):
+                card_num, card_suit = format_card(card)
+
+                # find the winner of the trick
+                if card_suit == self.current_trick_suit and card_num >= max_card:
+                    max_card = card_num
+                    winner = player_id
+                
+                # handle trick score
+                if card_suit == "h":
+                    trick_score += 1
+                elif card_suit == "s" and card_num == 10:
+                    trick_score += 13
+
+            # update score and current player
+            self.players[winner].score += trick_score
+            reward[winner] = trick_score
+            self.current_player_num = winner
+            self.trick_start_pos = winner
+
+            # reset the trick suit
+            self.current_trick_suit = None
+
+
+            # reset the trick
+            for i, card in enumerate(self.current_trick):
+                self.current_trick[i] = -1
+
+            # handle end of game and end of round
+            if self.players[winner].score >= 100:
+                self.terminated = True
+            elif len(self.remaining_cards) == 0:
+                self.reset_round()
         else:
-            # add card to trick
-            self.current_trick.append(action)
-
-            # remove card from player's hand
-            player_id = self.current_player_num
-            self.players[player_id].discard(action)
-            # remove card from remaining cards list
-            self.remaining_cards.remove(action)
-
-            # handle end of trick
-            if (self.trick_start_pos - 1) % self.n_players == self.current_player_num:
-                # check who won the trick and update their score
-                trick_score = 0
-                max_card = 0
-                winner = None
-                for player_id, card in enumerate(self.current_trick):
-                    card_num, card_suit = format_card(card)
-
-                    # find the winner of the trick
-                    if card_suit == self.current_trick_suit and card_num > max_card:
-                        max_card = card_num
-                        winner = player_id
-                    
-                    # handle trick score
-                    if card_suit == "h":
-                        trick_score += 1
-                    elif card_suit == "s" and card_num == 10:
-                        trick_score += 13
-
-                # update score and current player
-                self.players[winner].score += trick_score
-                reward[winner] = trick_score
-                self.current_player_num = winner
-                self.trick_start_pos = winner
-
-                # handle end of game
-                if self.players[winner].score >= 100:
-                    self.terminated = True
+            # move to next player
+            self.current_player_num = (player_id - 1) % 4
 
         self.render()
-            
-        return self.observation, reward, self.terminated, False, {}
 
+        observation = self._get_obs()
+            
+        return observation, reward, self.terminated, False, {}
 
     def render(self):
-
         if not self.terminated:
             print(f"Player {self.current_player_num}'s Turn")
 
@@ -224,6 +226,30 @@ class HeartsEnv(gym.Env):
 
     def close(self):
         return
+
+    def reset_round(self):
+        # reset and shuffle the deck
+        self.deck = Deck()
+        self.deck.shuffle()
+
+        # reset remaining card tracker
+        self.remaining_cards = [x for x in range(52)]
+        
+        for player in self.players:
+            # deal player new hand
+            player.hand = self.deck.draw(13)
+
+            # if player has the 2 of clubs
+            if 13 in player.hand:
+                # add 2 of clubs to current trick and discard from player's hand
+                self.current_trick[player.id] = 13
+                player.discard(13)
+                self.current_trick_suit = "c"
+                self.trick_start_pos = player.id
+                self.remaining_cards.remove(13)
+
+                # set current player to the left of player with 2 of clubs
+                self.current_player_num = (player.id - 1) % 4
 
 def format_card(card):
     # handle empty card
