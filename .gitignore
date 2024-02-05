@@ -1,3 +1,6 @@
 SIMPLE/
+!SIMPLE/app/environments/hearts/
+!SIMPLE/app/environments/hearts/*
+!SIMPLE/app/models/hearts/*
 OpenAI-Gym-Hearts/
 Hearts-master/
