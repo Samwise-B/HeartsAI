@@ -4,4 +4,5 @@ jobs:
     test-obs-method:
         runs-on: ubuntu-latest
         steps:
+            - uses: actions/checkout@v2
             - run: python3 "SIMPLE/app/environments/hearts/environment-test.py"
