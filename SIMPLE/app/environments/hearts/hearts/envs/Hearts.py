@@ -59,7 +59,8 @@ class HeartsEnv(gym.Env):
         # one-hot encode the trick
         trick_obs = np.zeros(52)
         for i, card in enumerate(trick):
-            trick_obs[card] = 1
+            if card != -1:
+                trick_obs[card] = 1
 
         ret = trick_obs
 
@@ -132,7 +133,7 @@ class HeartsEnv(gym.Env):
         current_player = self.players[self.current_player_num]
         can_follow_suit = False
         for i, card in enumerate(current_player.hand):
-            card_num, card_suit = format_card(card)
+            card_num, card_suit = self.format_card(card)
             if card_suit == self.current_trick_suit:
                 legal_actions[i] = 1
                 can_follow_suit = True
@@ -194,7 +195,7 @@ class HeartsEnv(gym.Env):
 
         # handle trick start
         if player_id == self.trick_start_pos:
-            card_num, card_suit = format_card(action)
+            card_num, card_suit = self.format_card(action)
             self.current_trick_suit = card_suit
         
         # handle trick end
@@ -204,7 +205,7 @@ class HeartsEnv(gym.Env):
             max_card = 0
             winner = None
             for player_id, card in enumerate(self.current_trick):
-                card_num, card_suit = format_card(card)
+                card_num, card_suit = self.format_card(card)
 
                 # find the winner of the trick
                 if card_suit == self.current_trick_suit and card_num >= max_card:
@@ -293,6 +294,10 @@ class HeartsEnv(gym.Env):
 
         # reset remaining card tracker
         self.remaining_cards = [x for x in range(52)]
+
+        # reset current trick
+        for i, card in enumerate(self.current_trick):
+            self.current_trick[i] = -1
         
         for player in self.players:
             # deal player new hand
@@ -303,6 +308,8 @@ class HeartsEnv(gym.Env):
                 # add 2 of clubs to current trick and discard from player's hand
                 self.current_trick[player.id] = 13
                 player.discard(13)
+
+                # set trick suit, start pos and remove 2c from remaining cards
                 self.current_trick_suit = "c"
                 self.trick_start_pos = player.id
                 self.remaining_cards.remove(13)
@@ -310,30 +317,30 @@ class HeartsEnv(gym.Env):
                 # set current player to the left of player with 2 of clubs
                 self.current_player_num = (player.id - 1) % 4
 
-def format_card(card):
-    # handle empty card
-    if card == -1:
-        return card, ""
-    
-    card_num = card % 13
-    card_suit = None
-    if card < 13:
-        card_suit = "s"
-    elif card < 26:
-        card_suit = "c"
-    elif card < 39:
-        card_suit = "d"
-    elif card < 52:
-        card_suit = "h"
+    def format_card(self, card):
+        # handle empty card
+        if card == -1:
+            return card, ""
+        
+        card_num = card % 13
+        card_suit = None
+        if card < 13:
+            card_suit = "s"
+        elif card < 26:
+            card_suit = "c"
+        elif card < 39:
+            card_suit = "d"
+        elif card < 52:
+            card_suit = "h"
 
-    return card_num, card_suit
+        return card_num, card_suit
 
-def card_to_string(card):
-    # handle empty card
-    if card == -1:
-        return card
-    else:
-        return cards[card]
+    def card_to_string(self, card):
+        # handle empty card
+        if card == -1:
+            return card
+        else:
+            return cards[card]
 
 class Player():
     def __init__(self, id):
