@@ -220,7 +220,7 @@ class HeartsEnv(gym.Env):
 
             # update score and current player
             self.players[winner].score += trick_score
-            reward[winner] = trick_score
+            reward[winner] = -1 * trick_score
             self.current_player_num = winner
             self.trick_start_pos = winner
 

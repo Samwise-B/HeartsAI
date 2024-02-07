@@ -155,10 +155,181 @@ class TestResetMethods(unittest.TestCase):
         for i, player in enumerate(self.old_players):
             self.assertEqual(player.score, 0, "player score has not reset")
 
-class TestStepMethod(unittest.TestCase):
+class TestNormalStep(unittest.TestCase):
     def setUp(self):
+        self.env = HeartsEnv()
+        self.obs, self.info = self.env.reset()
+        self.player_id = self.env.current_player_num
+        self.player_cards = self.env.players[self.player_id].hand
+
+        # play a card
+        self.card = None
+        for i, card in enumerate(self.player_cards):
+            if card != -1:
+                self.obs, self.reward, self.terminated, _ = self.env.step(i)
+                self.index = i
+                self.card = card
+    
+    def test_trick_contains_card(self):
+        # check trick contains card
+        self.assertEqual(self.env.current_trick[self.player_id], self.card, "trick does not contain card played.")
+
+    def test_playernum_updated(self):
+        # check current player was updated
+        self.assertEqual(self.env.current_player_num, (self.player_id - 1) % self.env.n_players, "current player incorrectly updated")
+        
+class TestTrickStart(unittest.TestCase):
+    def setUp(self):
+        self.env = HeartsEnv()
+        self.obs, self.info = self.env.reset()
+        self.card = 0
+        for i, player in enumerate(self.env.players):
+            for j in range(13):
+                player.hand[j] = self.card
+                self.card += 1
+
+        self.env.current_player_num = 0
+        self.env.current_trick = [-1 for i in range(4)]
+        self.env.current_trick_suit = None
+        self.env.trick_start_pos = 0
+
+        self.player_id = 0
+        self.card = 5
+        self.obs, self.reward, self.terminated, _ = self.env.step(self.card)
+
+    def test_trick_suit(self):
+        # check trick suit was properly updated
+        self.assertEqual(self.env.current_trick_suit, "s", "trick suit not updated on start")
+
+    def test_trick_contains_card(self):
+        # check trick contains player card
+        self.assertEqual(self.env.current_trick[self.player_id], self.card, "trick does not contain card played.")
+
+    def test_player_updated(self):
+        # check current player was updated
+        self.assertEqual(self.env.current_player_num, (self.player_id - 1) % self.env.n_players, "current player incorrectly updated")
+
+    def test_remaining_cards_updated(self): 
+        # check remaining cards was updated
         pass
 
+class TestStepEndTrick(unittest.TestCase):
+    def setUp(self):
+        self.obs, self.info = self.env.reset()
+        card = 0
+        for i, player in enumerate(self.env.players):
+            for j in range(13):
+                player.hand[j] = card
+                card += 1
+
+        self.env.current_player_num = 0
+        self.env.current_trick = [-1 for i in range(4)]
+        self.env.current_trick_suit = None
+        self.env.trick_start_pos = 0
+
+        self.player_id = 0
+        card = 10 # Qs
+        self.obs, self.reward, self.terminated, _ = self.env.step(card)
+
+        self.player_id = 1
+        card = 14 # 3c
+        self.obs, self.reward, self.terminated, _ = self.env.step(card)
+
+        self.player_id = 2
+        card = 30 # 6d
+        self.obs, self.reward, self.terminated, _ = self.env.step(card)
+
+        self.player_id = 3
+        card = 48 # Jh
+        self.obs, self.reward, self.terminated, _ = self.env.step(card)
+
+    def test_reward(self):
+        self.assertEqual(self.reward, -14, "reward not correct")
+
+    def test_player_score_updated(self):
+        self.assertEqual(self.env.players[0].score, 14, "player score not updated")
+
+    def test_trick_start_updated(self):
+        self.assertEqual(self.env.trick_start_pos, 0, "trick start position not updated to winner")
+
+    def test_current_player_updated(self):
+        self.assertEqual(self.env.current_player_num, 0, "current player not updated to winner")
+
+    def test_trick_suit_reset(self):
+        self.assertEqual(self.env.current_trick_suit, None, "trick's suit not reset")
+
+    def test_trick_reset(self):
+        self.assertEqual(self.env.current_trick, [-1 for i in range(4)], "trick not reset")
+
+class TestStepEnd():
+    def setUp(self):
+        self.obs, self.info = self.env.reset()
+        card = 0
+        self.old_players = copy.deepcopy(self.env.players)
+        for i, player in enumerate(self.env.players):
+            player.hand[i] = card
+            card += 1
+
+        self.env.current_player_num = 0
+        self.env.current_trick = [-1 for i in range(4)]
+        self.env.current_trick_suit = None
+        self.env.trick_start_pos = 0
+        self.env.remaining_cards = [i if i < 4 else 0 for i in range(52)]
+
+        player_id = 0
+        card = 0 # 2s
+        obs, reward, terminated, _ = self.env.step(card)
+
+        player_id = 1
+        card = 1 # 3s
+        obs, reward, terminated, _ = self.env.step(card)
+
+        player_id = 2
+        card = 2 # 4s
+        obs, reward, terminated, _ = self.env.step(card)
+
+        player_id = 3
+        card = 3 # 5s
+        obs, reward, terminated, _ = self.env.step(card)
+    
+    def test_round_end(self):
+        for i, player in enumerate(self.env.players):
+            self.assertNotEqual(player.hand, self.old_players[i].hand, "round has not been reset")
+
+class TestRoundEnd(unittest.TestCase):
+    def setUp(self):
+        self.obs, self.info = self.env.reset()
+        card = 0
+        self.old_players = copy.deepcopy(self.env.players)
+        for i, player in enumerate(self.env.players):
+            player.hand[i] = card
+            card += 1
+
+        self.env.current_player_num = 0
+        self.env.current_trick = [-1 for i in range(4)]
+        self.env.current_trick_suit = None
+        self.env.trick_start_pos = 0
+        self.env.remaining_cards = [i if i < 4 else 0 for i in range(52)]
+
+        player_id = 0
+        card = 0 # 2s
+        obs, reward, terminated, _ = self.env.step(card)
+
+        player_id = 1
+        card = 1 # 3s
+        obs, reward, terminated, _ = self.env.step(card)
+
+        player_id = 2
+        card = 2 # 4s
+        obs, reward, terminated, _ = self.env.step(card)
+
+        player_id = 3
+        self.env.players[3].score == 100
+        card = 3 # 5s
+        self.obs, self.reward, self.terminated, _ = self.env.step(card)
+
+    def test_end_of_game(self):
+        self.assertEqual(self.terminated, True, "termination flag not set at game end")
 
 def test_card_to_string(env, card, exp_val):
     pass
