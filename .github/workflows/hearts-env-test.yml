@@ -13,6 +13,7 @@ jobs:
               run: |
                 python3 -m pip install --upgrade pip
                 pip install gym
+                pip install stable_baselines
                 pip install numpy
             - name: Run Tests
               run: python3 "SIMPLE/app/environments/hearts/environment-test.py"
