@@ -13,8 +13,8 @@ jobs:
               run: |
                 python3 -m pip install --upgrade pip
                 pip install gym
-                pip install tensorflow==1.14
-                pip install stable_baselines
+                pip install tensorflow==1.15.0
+                pip install stable-baselines[mpi]==2.10.1
                 pip install numpy
             - name: Run Tests
               run: python3 "SIMPLE/app/environments/hearts/environment-test.py"
