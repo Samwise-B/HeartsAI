@@ -3,6 +3,8 @@ import random
 import numpy as np
 import math
 
+from stable_baselines import logger
+
 maxScore = 100
 
 cards = {
@@ -106,26 +108,8 @@ class HeartsEnv(gym.Env):
 
         return ret
                 
-
-
     def _get_info(self):
         return {}
-    
-    # def legal_actions(self):
-    #     legal_actions = []
-    #     current_player = self.players[self.current_player_num]
-    #     can_follow_suit = False
-    #     for i, card in enumerate(current_player.hand):
-    #         card_num, card_suit = format_card(card)
-    #         if card_suit == self.current_trick_suit:
-    #             legal_actions.append(i)
-    #             can_follow_suit = True
-    #     if not can_follow_suit:
-    #         for i, card in enumerate(current_player.hand):
-    #             if card != -1:
-    #                 legal_actions.append(i)
-
-    #     return legal_actions
     
     @property
     def legal_actions(self):
@@ -143,8 +127,6 @@ class HeartsEnv(gym.Env):
                     legal_actions[i] = 1
 
         return legal_actions
-        
-
 
     def reset(self, seed=None):
         # following line to seed self.np_random
@@ -168,17 +150,43 @@ class HeartsEnv(gym.Env):
         self.terminated = False
 
         return self.observation, info
+    
+    def reset_round(self):
+        # reset and shuffle the deck
+        self.deck = Deck()
+        self.deck.shuffle()
+
+        # reset remaining card tracker
+        self.remaining_cards = [x for x in range(52)]
+
+        # reset current trick
+        for i, card in enumerate(self.current_trick):
+            self.current_trick[i] = -1
+        
+        for player in self.players:
+            # deal player new hand
+            player.hand = self.deck.draw(13)
+
+            # if player has the 2 of clubs
+            if 13 in player.hand:
+                # add 2 of clubs to current trick and discard from player's hand
+                self.current_trick[player.id] = 13
+                player.discard(13)
+
+                # set trick suit, start pos and remove 2c from remaining cards
+                self.current_trick_suit = "c"
+                self.trick_start_pos = player.id
+                self.remaining_cards.remove(13)
+
+                # set current player to the left of player with 2 of clubs
+                self.current_player_num = (player.id - 1) % 4
 
     def step(self, action):
         terminated = False
         reward = [0] * self.n_players
 
-        
+        self.render_player_hand()
 
-        # if self.legal_actions[action] == 0:
-        #     # handle illegal actions
-        #     pass
-        # else:
         player_id = self.current_player_num
 
         # set action (index) to card
@@ -192,6 +200,8 @@ class HeartsEnv(gym.Env):
         self.players[player_id].discard(action)
         # remove card from remaining cards list
         self.remaining_cards.remove(action)
+
+        logger.debug(f"Player {player_id} played: {self.card_to_string(action)}")
 
         # handle trick start
         if player_id == self.trick_start_pos:
@@ -224,6 +234,12 @@ class HeartsEnv(gym.Env):
             self.current_player_num = winner
             self.trick_start_pos = winner
 
+            logger.debug(f"Player {winner} won the trick.")
+
+            logger.debug("---- Player Scores ----")
+            for player in self.players:
+                logger.debug(f"Player {player.id}:{player.score}")
+
             # reset the trick suit
             self.current_trick_suit = None
 
@@ -248,74 +264,45 @@ class HeartsEnv(gym.Env):
 
     def render(self, mode='human', close=False):
         pass
-        # if not self.terminated:
-        #     print(f"Player {self.current_player_num}'s Turn")
+        if not self.terminated:
+            logger.debug(f"Player {self.current_player_num}'s Turn")
 
-        #     print("---- Player Scores ----")
-        #     for player in self.players:
-        #         print(f"Player {player.id}:{player.score}")
+            logger.debug("---- Player Position ----")
+            logger.debug(f"=> {(self.current_player_num - self.trick_start_pos) % self.n_players}")
 
-        #     print("---- Player Position ----")
-        #     print(f"=> {(self.current_player_num - self.trick_start_pos) % self.n_players}")
+            trick_str = ""
+            for card in self.current_trick:
+                card_str = self.card_to_string(card)
+                trick_str += f"{card_str} "
+            logger.debug("---- Current Trick ----")
+            logger.debug(f"=> {trick_str}")
 
-        #     trick_str = ""
-        #     for card in self.current_trick:
-        #         card_str = card_to_string(card)
-        #         trick_str += f"{card_str} "
-        #     print("---- Current Trick ----")
-        #     print(f"=> {trick_str}")
-
-        #     player_cards_str = ""
-        #     for card in self.players[self.current_player_num].hand:
-        #         card_str = card_to_string(card)
-        #         player_cards_str += f"{card_str} "
-
-        #     print("---- Your Cards ----")
-        #     print(f"=> {player_cards_str}")
-        # else:
-        #     print("---- Player Scores ----")
-        #     min_score = math.inf
-        #     winner = None
-        #     for player in self.players:
-        #         print(f"Player {player.id}:{player.score}")
-        #         if player.score < min_score:
-        #             min_score = player.score
-        #             winner = player.id
             
-        #     print(f"Player {winner} wins!")
+        else:
+            logger.debug("---- Player Scores ----")
+            min_score = math.inf
+            winner = None
+            for player in self.players:
+                logger.debug(f"Player {player.id}:{player.score}")
+                if player.score < min_score:
+                    min_score = player.score
+                    winner = player.id
+            
+            logger.debug(f"Player {winner} wins!")
+
+    def render_player_hand(self):
+        player_cards_str = ""
+        for card in self.players[self.current_player_num].hand:
+            card_str = self.card_to_string(card)
+            player_cards_str += f"{card_str} "
+
+        logger.debug("---- Your Cards ----")
+        logger.debug(f"=> {player_cards_str}")
 
     def close(self):
         return
 
-    def reset_round(self):
-        # reset and shuffle the deck
-        self.deck = Deck()
-        self.deck.shuffle()
-
-        # reset remaining card tracker
-        self.remaining_cards = [x for x in range(52)]
-
-        # reset current trick
-        for i, card in enumerate(self.current_trick):
-            self.current_trick[i] = -1
-        
-        for player in self.players:
-            # deal player new hand
-            player.hand = self.deck.draw(13)
-
-            # if player has the 2 of clubs
-            if 13 in player.hand:
-                # add 2 of clubs to current trick and discard from player's hand
-                self.current_trick[player.id] = 13
-                player.discard(13)
-
-                # set trick suit, start pos and remove 2c from remaining cards
-                self.current_trick_suit = "c"
-                self.trick_start_pos = player.id
-                self.remaining_cards.remove(13)
-
-                # set current player to the left of player with 2 of clubs
-                self.current_player_num = (player.id - 1) % 4
+    
 
     def format_card(self, card):
         # handle empty card
