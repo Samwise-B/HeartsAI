@@ -12,6 +12,7 @@ jobs:
             - name: Install Dependencies
               run: |
                 python3 -m pip install --upgrade pip
+                pip install tensorflow
                 pip install gym
                 pip install stable_baselines
                 pip install numpy
