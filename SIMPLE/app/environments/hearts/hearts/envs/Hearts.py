@@ -189,72 +189,80 @@ class HeartsEnv(gym.Env):
 
         player_id = self.current_player_num
 
-        # set action (index) to card
-        action = self.players[player_id].hand[action]
-        
-        # add card to trick
-        self.current_trick[player_id] = action
-        #print(self.current_trick)
-        #print(self.players[player_id].hand)
-        # remove card from player's hand
-        self.players[player_id].discard(action)
-        # remove card from remaining cards list
-        self.remaining_cards.remove(action)
-
-        logger.debug(f"Player {player_id} played: {self.card_to_string(action)}")
-
-        # handle trick start
-        if player_id == self.trick_start_pos:
-            card_num, card_suit = self.format_card(action)
-            self.current_trick_suit = card_suit
-        
-        # handle trick end
-        if (self.trick_start_pos + 1) % self.n_players == self.current_player_num:
-            # check who won the trick and update their score
-            trick_score = 0
-            max_card = 0
-            winner = None
-            for player_id, card in enumerate(self.current_trick):
-                card_num, card_suit = self.format_card(card)
-
-                # find the winner of the trick
-                if card_suit == self.current_trick_suit and card_num >= max_card:
-                    max_card = card_num
-                    winner = player_id
-                
-                # handle trick score
-                if card_suit == "h":
-                    trick_score += 1
-                elif card_suit == "s" and card_num == 10:
-                    trick_score += 13
-
-            # update score and current player
-            self.players[winner].score += trick_score
-            reward[winner] = -1 * trick_score
-            self.current_player_num = winner
-            self.trick_start_pos = winner
-
-            logger.debug(f"Player {winner} won the trick.")
-
-            logger.debug("---- Player Scores ----")
-            for player in self.players:
-                logger.debug(f"Player {player.id}:{player.score}")
-
-            # reset the trick suit
-            self.current_trick_suit = None
-
-            # reset the trick
-            for i, card in enumerate(self.current_trick):
-                self.current_trick[i] = -1
-
-            # handle end of game and end of round
-            if self.players[winner].score >= 100:
-                self.terminated = True
-            elif len(self.remaining_cards) == 0:
-                self.reset_round()
+        if self.legal_actions[action] == 0:
+            #raise Exception(f"Invalid action: {action}, {self.players[player_id.hand]}")
+            # handling illegal actions for evaluation callback
+            logger.debug(f"Invalid action: {action}, {self.players[player_id.hand]}")
+            reward = [player.score for player in self.players]
+            reward[self.current_player_num] = -100
+            terminated = True
         else:
-            # move to next player
-            self.current_player_num = (player_id - 1) % 4
+            # set action (index) to card
+            action = self.players[player_id].hand[action]
+            
+            # add card to trick
+            self.current_trick[player_id] = action
+            #print(self.current_trick)
+            #print(self.players[player_id].hand)
+            # remove card from player's hand
+            self.players[player_id].discard(action)
+            # remove card from remaining cards list
+            self.remaining_cards.remove(action)
+
+            logger.debug(f"Player {player_id} played: {self.card_to_string(action)}")
+
+            # handle trick start
+            if player_id == self.trick_start_pos:
+                card_num, card_suit = self.format_card(action)
+                self.current_trick_suit = card_suit
+            
+            # handle trick end
+            if (self.trick_start_pos + 1) % self.n_players == self.current_player_num:
+                # check who won the trick and update their score
+                trick_score = 0
+                max_card = 0
+                winner = None
+                for player_id, card in enumerate(self.current_trick):
+                    card_num, card_suit = self.format_card(card)
+
+                    # find the winner of the trick
+                    if card_suit == self.current_trick_suit and card_num >= max_card:
+                        max_card = card_num
+                        winner = player_id
+                    
+                    # handle trick score
+                    if card_suit == "h":
+                        trick_score += 1
+                    elif card_suit == "s" and card_num == 10:
+                        trick_score += 13
+
+                # update score and current player
+                self.players[winner].score += trick_score
+                reward[winner] = -1 * trick_score
+                self.current_player_num = winner
+                self.trick_start_pos = winner
+
+                logger.debug(f"Player {winner} won the trick.")
+
+                logger.debug("---- Player Scores ----")
+                for player in self.players:
+                    logger.debug(f"Player {player.id}:{player.score}")
+
+                # reset the trick suit
+                self.current_trick_suit = None
+
+                # reset the trick
+                for i, card in enumerate(self.current_trick):
+                    self.current_trick[i] = -1
+
+                # handle end of game and end of round
+                if self.players[winner].score >= 100:
+                    self.terminated = True
+                elif len(self.remaining_cards) == 0:
+                    self.reset_round()
+            else:
+                # move to next player
+                self.current_player_num = (player_id - 1) % 4
 
         self.render()
 
@@ -296,7 +304,7 @@ class HeartsEnv(gym.Env):
             card_str = self.card_to_string(card)
             player_cards_str += f"{card_str} "
 
-        logger.debug("---- Your Cards ----")
+        logger.debug(f"---- Player {self.current_player_num} Cards ----")
         logger.debug(f"=> {player_cards_str}")
 
     def close(self):
