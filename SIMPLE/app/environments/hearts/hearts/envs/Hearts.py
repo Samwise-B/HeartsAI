@@ -182,15 +182,12 @@ class HeartsEnv(gym.Env):
                 self.current_player_num = (player.id - 1) % 4
 
     def step(self, action):
-        terminated = False
+        self.terminated = False
         reward = [0] * self.n_players
 
         self.render_player_hand()
 
         player_id = self.current_player_num
-
-        # set action (index) to card
-        action = self.players[player_id].hand[action]
 
         if self.legal_actions[action] == 0:
             #raise Exception(f"Invalid action: {action}, {self.players[player_id.hand]}")
@@ -198,10 +195,12 @@ class HeartsEnv(gym.Env):
             logger.debug(f"Invalid action: {action}, {self.players[player_id].hand}")
             reward = [player.score for player in self.players]
             reward[self.current_player_num] = -100
-            terminated = True
+            self.terminated = True
         else:
             
             #action = self.players[player_id].hand[action]
+            # set action (index) to card
+            action = self.players[player_id].hand[action]
             
             # add card to trick
             self.current_trick[player_id] = action
