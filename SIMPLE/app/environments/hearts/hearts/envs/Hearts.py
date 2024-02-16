@@ -192,7 +192,7 @@ class HeartsEnv(gym.Env):
         if self.legal_actions[action] == 0:
             #raise Exception(f"Invalid action: {action}, {self.players[player_id.hand]}")
             # handling illegal actions for evaluation callback
-            logger.debug(f"Invalid action: {action}, {self.players[player_id.hand]}")
+            logger.debug(f"Invalid action: {action}, {self.players[player_id].hand}")
             reward = [player.score for player in self.players]
             reward[self.current_player_num] = -100
             terminated = True
