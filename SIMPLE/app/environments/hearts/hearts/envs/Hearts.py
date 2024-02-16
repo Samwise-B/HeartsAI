@@ -189,6 +189,9 @@ class HeartsEnv(gym.Env):
 
         player_id = self.current_player_num
 
+        # set action (index) to card
+        action = self.players[player_id].hand[action]
+
         if self.legal_actions[action] == 0:
             #raise Exception(f"Invalid action: {action}, {self.players[player_id.hand]}")
             # handling illegal actions for evaluation callback
@@ -197,8 +200,8 @@ class HeartsEnv(gym.Env):
             reward[self.current_player_num] = -100
             terminated = True
         else:
-            # set action (index) to card
-            action = self.players[player_id].hand[action]
+            
+            #action = self.players[player_id].hand[action]
             
             # add card to trick
             self.current_trick[player_id] = action
