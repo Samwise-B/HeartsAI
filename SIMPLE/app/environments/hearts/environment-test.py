@@ -165,7 +165,7 @@ class TestNormalStep(unittest.TestCase):
         # play a card
         self.card = None
         for i, card in enumerate(self.player_cards):
-            if card != -1:
+            if card != -1 and self.env.legal_actions[i] == 1:
                 self.obs, self.reward, self.terminated, _ = self.env.step(i)
                 self.index = i
                 self.card = card
