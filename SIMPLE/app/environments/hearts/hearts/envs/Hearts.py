@@ -183,7 +183,7 @@ class HeartsEnv(gym.Env):
 
     def step(self, action):
         self.terminated = False
-        reward = [0] * self.n_players
+        reward = [0.005] * self.n_players
 
         self.render_player_hand()
 
@@ -240,7 +240,7 @@ class HeartsEnv(gym.Env):
 
                 # update score and current player
                 self.players[winner].score += trick_score
-                reward[winner] = -1 * trick_score
+                reward[winner] = -0.01 * trick_score
                 self.current_player_num = winner
                 self.trick_start_pos = winner
 

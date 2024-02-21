@@ -259,7 +259,7 @@ class TestStepEndTrick(unittest.TestCase):
         
 
     def test_reward(self):
-        self.assertEqual(sum(self.reward), -14, "reward not correct")
+        self.assertEqual(sum(self.reward), -0.135, "reward not correct")
 
     def test_player_score_updated(self):
         self.assertEqual(self.env.players[0].score, 14, "player score not updated")
