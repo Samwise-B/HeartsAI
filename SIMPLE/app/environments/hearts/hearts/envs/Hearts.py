@@ -52,6 +52,8 @@ class HeartsEnv(gym.Env):
         self.current_trick = [-1 for i in range(4)]
         self.current_trick_suit = None
         self.trick_start_pos = 0
+        self.total_rounds = 0
+        self.total_tricks = 1
 
         self.terminated = False
 
@@ -136,6 +138,8 @@ class HeartsEnv(gym.Env):
             # clear player hand and score
             player.reset()
 
+        self.total_rounds = 1
+
         # reset the round
         self.reset_round()
 
@@ -155,6 +159,8 @@ class HeartsEnv(gym.Env):
         # reset and shuffle the deck
         self.deck = Deck()
         self.deck.shuffle()
+
+        self.total_rounds += 1
 
         # reset remaining card tracker
         self.remaining_cards = [x for x in range(52)]
@@ -183,9 +189,11 @@ class HeartsEnv(gym.Env):
 
     def step(self, action):
         self.terminated = False
-        reward = [0.005] * self.n_players
+        reward = [0] * self.n_players
 
         self.render_player_hand()
+
+        self.render_trick()
 
         player_id = self.current_player_num
 
@@ -211,12 +219,16 @@ class HeartsEnv(gym.Env):
             # remove card from remaining cards list
             self.remaining_cards.remove(action)
 
-            logger.debug(f"Player {player_id} played: {self.card_to_string(action)}")
+            # give player reward for playing card
+            #reward[player_id] = 0.005
+
+            logger.debug(f"Played: {self.card_to_string(action)}")
 
             # handle trick start
             if player_id == self.trick_start_pos:
                 card_num, card_suit = self.format_card(action)
                 self.current_trick_suit = card_suit
+                self.total_tricks += 1
             
             # handle trick end
             if (self.trick_start_pos + 1) % self.n_players == self.current_player_num:
@@ -240,7 +252,7 @@ class HeartsEnv(gym.Env):
 
                 # update score and current player
                 self.players[winner].score += trick_score
-                reward[winner] = -0.01 * trick_score
+                reward[winner] += -0.01 * trick_score
                 self.current_player_num = winner
                 self.trick_start_pos = winner
 
@@ -260,40 +272,29 @@ class HeartsEnv(gym.Env):
                 # handle end of game and end of round
                 if self.players[winner].score >= 100:
                     self.terminated = True
+                    logger.debug(f"Total Tricks Played: {self.total_tricks}")
+                    logger.debug(f"Total Rounds Played: {self.total_rounds}")
                 elif len(self.remaining_cards) == 0:
                     self.reset_round()
             else:
                 # move to next player
                 self.current_player_num = (player_id - 1) % 4
 
-        self.render()
+        #self.render()
 
         self.observation = self._get_obs()
             
         return self.observation, reward, self.terminated, False
 
     def render(self, mode='human', close=False):
-        pass
         if not self.terminated:
-            logger.debug(f"Player {self.current_player_num}'s Turn")
-
-            logger.debug("---- Player Position ----")
-            logger.debug(f"=> {(self.current_player_num - self.trick_start_pos) % self.n_players}")
-
-            trick_str = ""
-            for card in self.current_trick:
-                card_str = self.card_to_string(card)
-                trick_str += f"{card_str} "
-            logger.debug("---- Current Trick ----")
-            logger.debug(f"=> {trick_str}")
-
-            
+            logger.debug(f"Player {self.current_player_num}'s Turn")    
         else:
-            logger.debug("---- Player Scores ----")
+            #logger.debug("---- Player Scores ----")
             min_score = math.inf
             winner = None
             for player in self.players:
-                logger.debug(f"Player {player.id}:{player.score}")
+                #logger.debug(f"Player {player.id}:{player.score}")
                 if player.score < min_score:
                     min_score = player.score
                     winner = player.id
@@ -308,6 +309,18 @@ class HeartsEnv(gym.Env):
 
         logger.debug(f"---- Player {self.current_player_num} Cards ----")
         logger.debug(f"=> {player_cards_str}")
+
+    def render_trick(self):
+        trick_str = ""
+        for card in self.current_trick:
+            card_str = self.card_to_string(card)
+            trick_str += f"{card_str} "
+        logger.debug("---- Current Trick ----")
+        logger.debug(f"=> {trick_str}")
+        player_pos_str = ["  " if i != self.current_player_num else "^" for i in range(self.n_players)]
+        logger.debug(f"=> {' '.join(player_pos_str)}   (position)")
+        #logger.debug(f"=> {(self.current_player_num - self.trick_start_pos) % self.n_players}")
+
 
     def close(self):
         return
