@@ -202,7 +202,7 @@ class HeartsEnv(gym.Env):
             # handling illegal actions for evaluation callback
             logger.debug(f"Invalid action: {action}, {self.players[player_id].hand}")
             reward = [player.score for player in self.players]
-            reward[self.current_player_num] = -100
+            reward[self.current_player_num] = -1
             self.terminated = True
         else:
             
@@ -285,6 +285,75 @@ class HeartsEnv(gym.Env):
         self.observation = self._get_obs()
             
         return self.observation, reward, self.terminated, False
+    
+    def rules_move(self):
+        player_id = self.current_player_num
+        # handle non-leading tricks
+        if self.trick_start_pos != player_id:
+            actions = []
+            for i, card in enumerate(self.players[player_id].hand):
+                if card == -1:
+                    actions.append(0)
+                else:
+                    actions.append(1)
+            
+            # handle can play any card
+            if np.array_equal(self.legal_actions, actions):
+                max_card = -1
+                max_card_ind = -1
+                max_heart_ind = -1
+                max_heart = -1
+                for i, card in enumerate(self.players[player_id].hand):
+                    if card == 10:
+                        # if player has Qs, play it
+                        return [1 if j == i else 0 for j in range(13)]
+                    elif card >= 39:
+                        # if player has a heart, track highest heart
+                        if max_heart < card:
+                            max_heart = card
+                            max_heart_ind = i
+                    elif card > max_card:
+                        max_card = card
+                        max_card_ind = i
+                # handle return array for max heart / card
+                if max_heart != -1:
+                    return [1 if i == max_heart_ind else 0 for i in range(13)]
+                else:
+                    return [1 if i == max_card_ind else 0 for i in range(13)]
+            else:
+                suit_to_num = {"s":[0, 13], "c":[13, 26], "d":[26, 39], "h":[39, 52]}
+                lower, upper = suit_to_num[self.current_trick_suit]
+                max_trick_card = max(self.current_trick)
+                max_card = -1
+                max_card_i = -1
+                min_card = math.inf
+                min_card_i = math.inf
+                # handle following suit
+                for i, card in enumerate(self.players[player_id].hand):
+                    if card >= lower and card < upper:
+                    # if card is of the same suit
+                        if card > max_card and card < max_trick_card:
+                            # update max card that is less than max_trick_card
+                            max_card = card
+                            max_card_i = i
+                        if card < min_card:
+                            min_card = card
+                            min_card_i = i
+                if max_card_i != -1:
+                    return [1 if i == max_card_i else 0 for i in range(13)]
+                else:
+                    return [1 if i == min_card_i else 0 for i in range(13)]
+        else:
+            # handle leading trick, play random card
+            indexes = []
+            # enumerate all indexes of hand which are unplayed cards
+            for i, card in enumerate(self.players[player_id].hand):
+                if card != -1:
+                    indexes.append(i)
+            # get a random index
+            i = indexes[random.randint(0, len(indexes)-1)]
+            return [1 if i == j else 0 for j in range(13)]
+
 
     def render(self, mode='human', close=False):
         if not self.terminated:
@@ -321,11 +390,8 @@ class HeartsEnv(gym.Env):
         logger.debug(f"=> {' '.join(player_pos_str)}   (position)")
         #logger.debug(f"=> {(self.current_player_num - self.trick_start_pos) % self.n_players}")
 
-
     def close(self):
         return
-
-    
 
     def format_card(self, card):
         # handle empty card

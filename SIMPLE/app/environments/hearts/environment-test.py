@@ -256,7 +256,6 @@ class TestStepEndTrick(unittest.TestCase):
 
         # player 1 plays 3c
         self.obs, self.reward, self.terminated, _ = self.env.step(1) # 3c
-        
 
     def test_reward(self):
         self.assertEqual(sum(self.reward), -0.14, "reward not correct")

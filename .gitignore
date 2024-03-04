@@ -20,6 +20,8 @@ SIMPLE/app/zoo/*
 !SIMPLE/app/zoo/hearts
 !SIMPLE/app/zoo/hearts/*
 
+SIMPLE/app/zoo/hearts/_model_*.zip
+
 SIMPLE/app/models/*
 !SIMPLE/app/models/hearts
 !SIMPLE/app/models/hearts/*
