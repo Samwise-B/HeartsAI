@@ -252,7 +252,7 @@ class HeartsEnv(gym.Env):
 
                 # update score and current player
                 self.players[winner].score += trick_score
-                reward[winner] += -0.01 * trick_score
+                #########reward[winner] += -0.01 * trick_score
                 self.current_player_num = winner
                 self.trick_start_pos = winner
 
@@ -274,6 +274,9 @@ class HeartsEnv(gym.Env):
                     self.terminated = True
                     logger.debug(f"Total Tricks Played: {self.total_tricks}")
                     logger.debug(f"Total Rounds Played: {self.total_rounds}")
+                    # handle reward
+                    scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
+                    reward[scores.index(min(scores))] = -1
                 elif len(self.remaining_cards) == 0:
                     self.reset_round()
             else:
