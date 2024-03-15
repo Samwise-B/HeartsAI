@@ -201,8 +201,10 @@ class HeartsEnv(gym.Env):
             #raise Exception(f"Invalid action: {action}, {self.players[player_id.hand]}")
             # handling illegal actions for evaluation callback
             logger.debug(f"Invalid action: {action}, {self.players[player_id].hand}")
-            reward = [player.score for player in self.players]
-            reward[self.current_player_num] = -1
+            # reward = [player.score for player in self.players]
+            # reward[self.current_player_num] = -1
+            scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
+            reward[scores.index(min(scores))] = 1
             self.terminated = True
         else:
             
@@ -276,7 +278,7 @@ class HeartsEnv(gym.Env):
                     logger.debug(f"Total Rounds Played: {self.total_rounds}")
                     # handle reward
                     scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
-                    reward[scores.index(min(scores))] = -1
+                    reward[scores.index(min(scores))] = 1
                 elif len(self.remaining_cards) == 0:
                     self.reset_round()
             else:

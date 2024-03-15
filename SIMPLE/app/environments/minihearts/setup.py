@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='hearts',
+    name='minihearts',
     version='0.1.0',
     description='Mini Hearts Gym Environment',
     packages=find_packages(),

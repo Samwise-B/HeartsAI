@@ -5,19 +5,23 @@ import math
 
 from stable_baselines import logger
 
-maxScore = 100
+maxScore = 45
+maxCardCount = 24
+numPlayerCards = 6
+startingCard = 6
+QofSpades = 3
 
 cards = {
-    0: "2s", 1: "3s", 2: "4s", 3: "5s", 4: "6s", 5: "7s", 6: "8s", 7: "9s", 8: "10s", 9: "Js", 10: "Qs", 11: "Ks", 12: "As",
-    13: "2c", 14: "3c", 15: "4c", 16: "5c", 17: "6c", 18: "7c", 19: "8c", 20: "9c", 21: "10c", 22: "Jc", 23: "Qc", 24: "Kc", 25: "Ac",
-    26: "2d", 27: "3d", 28:"4d", 29: "5d", 30: "6d", 31: "7d", 32:"8d", 33:"9d", 34: "10d", 35:"Jd", 36:"Qd", 37:"Kd", 38: "Ad", 
-    39: "2h", 40: "3h", 41: "4h", 42: "5h", 43: "6h", 44: "7h", 45:"8h", 46: "9h", 47:"10h", 48:"Jh", 49:"Qh", 50:"Kh", 51: "Ah"
+    0: "2s", 1: "3s", 2: "4s", 3: "5s", 4: "6s", 5: "7s",
+    6: "2c", 7: "3c", 8: "4c", 9: "5c", 10: "6c", 11: "7c",
+    12: "2d", 13: "3d", 14:"4d", 15: "5d", 16: "6d", 17: "7d", 
+    18: "2h", 19: "3h", 20: "4h", 21: "5h", 22: "6h", 23: "7h"
 }
 
 class MiniHeartsEnv(gym.Env):
     metadata = {'render.modes': ['human']}
     def __init__(self, verbose = False, manual = False):
-        self.name = "hearts"
+        self.name = "minihearts"
         self.maxScore = maxScore
 
         self.n_players = 4
@@ -36,18 +40,18 @@ class MiniHeartsEnv(gym.Env):
         # )
 
         self.observation_space = gym.spaces.Box(-1, 1, (
-            52 # current trick
-            + 52 # player's cards
-            + 4 # player's position
-            + 52  # remaining cards
-            + 13 # legal actions
+            maxCardCount     # current trick
+            + maxCardCount   # player's cards
+            + 4              # player's position
+            + maxCardCount   # remaining cards
+            + numPlayerCards # legal actions
             , )
         )
 
         # initialise action space
-        self.action_space = gym.spaces.Discrete(13)
+        self.action_space = gym.spaces.Discrete(numPlayerCards)
 
-        self.remaining_cards = [x for x in range(52)]
+        self.remaining_cards = [x for x in range(24)]
 
         self.current_trick = [-1 for i in range(4)]
         self.current_trick_suit = None
@@ -61,7 +65,7 @@ class MiniHeartsEnv(gym.Env):
         # get current trick values
         trick = np.array(self.current_trick)
         # one-hot encode the trick
-        trick_obs = np.zeros(52)
+        trick_obs = np.zeros(maxCardCount)
         for i, card in enumerate(trick):
             if card != -1:
                 trick_obs[card] = 1
@@ -70,8 +74,8 @@ class MiniHeartsEnv(gym.Env):
 
         # get player's hand
         player_id = self.current_player_num
-        player_cards = np.full(13, -1)
-        player_cards_obs = np.zeros(52)
+        player_cards = np.full(numPlayerCards, -1)
+        player_cards_obs = np.zeros(maxCardCount)
         for i, card in enumerate(self.players[player_id].hand):
             player_cards[i] = card
             player_cards_obs[card] = 1
@@ -90,7 +94,7 @@ class MiniHeartsEnv(gym.Env):
         
         # get remaining cards
         individuals_remaining_cards = []
-        remaining_cards_obs = np.zeros(52)
+        remaining_cards_obs = np.zeros(maxCardCount)
         for card in self.remaining_cards:
             if card not in player_cards:
                 individuals_remaining_cards.append(card)
@@ -115,7 +119,7 @@ class MiniHeartsEnv(gym.Env):
     
     @property
     def legal_actions(self):
-        legal_actions = np.zeros(13)
+        legal_actions = np.zeros(numPlayerCards)
         current_player = self.players[self.current_player_num]
         can_follow_suit = False
         for i, card in enumerate(current_player.hand):
@@ -163,7 +167,7 @@ class MiniHeartsEnv(gym.Env):
         self.total_rounds += 1
 
         # reset remaining card tracker
-        self.remaining_cards = [x for x in range(52)]
+        self.remaining_cards = [x for x in range(maxCardCount)]
 
         # reset current trick
         for i, card in enumerate(self.current_trick):
@@ -171,18 +175,18 @@ class MiniHeartsEnv(gym.Env):
         
         for player in self.players:
             # deal player new hand
-            player.hand = self.deck.draw(13)
+            player.hand = self.deck.draw(numPlayerCards)
 
             # if player has the 2 of clubs
-            if 13 in player.hand:
+            if startingCard in player.hand:
                 # add 2 of clubs to current trick and discard from player's hand
-                self.current_trick[player.id] = 13
-                player.discard(13)
+                self.current_trick[player.id] = startingCard
+                player.discard(startingCard)
 
                 # set trick suit, start pos and remove 2c from remaining cards
                 self.current_trick_suit = "c"
                 self.trick_start_pos = player.id
-                self.remaining_cards.remove(13)
+                self.remaining_cards.remove(startingCard)
 
                 # set current player to the left of player with 2 of clubs
                 self.current_player_num = (player.id - 1) % 4
@@ -220,7 +224,7 @@ class MiniHeartsEnv(gym.Env):
             self.remaining_cards.remove(action)
 
             # give player reward for playing card
-            #reward[player_id] = 0.005
+            reward[player_id] = 0.01
 
             logger.debug(f"Played: {self.card_to_string(action)}")
 
@@ -247,12 +251,12 @@ class MiniHeartsEnv(gym.Env):
                     # handle trick score
                     if card_suit == "h":
                         trick_score += 1
-                    elif card_suit == "s" and card_num == 10:
-                        trick_score += 13
+                    elif card_suit == "s" and card_num == QofSpades:
+                        trick_score += 6
 
                 # update score and current player
                 self.players[winner].score += trick_score
-                #########reward[winner] += -0.01 * trick_score
+                reward[winner] += -0.01 * trick_score
                 self.current_player_num = winner
                 self.trick_start_pos = winner
 
@@ -270,13 +274,13 @@ class MiniHeartsEnv(gym.Env):
                     self.current_trick[i] = -1
 
                 # handle end of game and end of round
-                if self.players[winner].score >= 100:
+                if self.players[winner].score >= maxScore:
                     self.terminated = True
                     logger.debug(f"Total Tricks Played: {self.total_tricks}")
                     logger.debug(f"Total Rounds Played: {self.total_rounds}")
-                    # handle reward
-                    scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
-                    reward[scores.index(min(scores))] = -1
+                    # handle reward (only binary case)
+                    #scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
+                    #reward[scores.index(min(scores))] = 1
                 elif len(self.remaining_cards) == 0:
                     self.reset_round()
             else:
@@ -307,10 +311,10 @@ class MiniHeartsEnv(gym.Env):
                 max_heart_ind = -1
                 max_heart = -1
                 for i, card in enumerate(self.players[player_id].hand):
-                    if card == 10:
+                    if card == QofSpades:
                         # if player has Qs, play it
-                        return [1 if j == i else 0 for j in range(13)]
-                    elif card >= 39:
+                        return [1 if j == i else 0 for j in range(numPlayerCards)]
+                    elif card >= 18:
                         # if player has a heart, track highest heart
                         if max_heart < card:
                             max_heart = card
@@ -320,11 +324,11 @@ class MiniHeartsEnv(gym.Env):
                         max_card_ind = i
                 # handle return array for max heart / card
                 if max_heart != -1:
-                    return [1 if i == max_heart_ind else 0 for i in range(13)]
+                    return [1 if i == max_heart_ind else 0 for i in range(numPlayerCards)]
                 else:
-                    return [1 if i == max_card_ind else 0 for i in range(13)]
+                    return [1 if i == max_card_ind else 0 for i in range(numPlayerCards)]
             else:
-                suit_to_num = {"s":[0, 13], "c":[13, 26], "d":[26, 39], "h":[39, 52]}
+                suit_to_num = {"s":[0, 6], "c":[6, 12], "d":[12, 18], "h":[18, 24]}
                 lower, upper = suit_to_num[self.current_trick_suit]
                 max_trick_card = max(self.current_trick)
                 max_card = -1
@@ -343,9 +347,9 @@ class MiniHeartsEnv(gym.Env):
                             min_card = card
                             min_card_i = i
                 if max_card_i != -1:
-                    return [1 if i == max_card_i else 0 for i in range(13)]
+                    return [1 if i == max_card_i else 0 for i in range(numPlayerCards)]
                 else:
-                    return [1 if i == min_card_i else 0 for i in range(13)]
+                    return [1 if i == min_card_i else 0 for i in range(numPlayerCards)]
         else:
             # handle leading trick, play random card
             indexes = []
@@ -355,7 +359,7 @@ class MiniHeartsEnv(gym.Env):
                     indexes.append(i)
             # get a random index
             i = indexes[random.randint(0, len(indexes)-1)]
-            return [1 if i == j else 0 for j in range(13)]
+            return [1 if i == j else 0 for j in range(numPlayerCards)]
 
 
     def render(self, mode='human', close=False):
@@ -401,15 +405,15 @@ class MiniHeartsEnv(gym.Env):
         if card == -1:
             return card, ""
         
-        card_num = card % 13
+        card_num = card % 6
         card_suit = None
-        if card < 13:
+        if card < 6:
             card_suit = "s"
-        elif card < 26:
+        elif card < 12:
             card_suit = "c"
-        elif card < 39:
+        elif card < 18:
             card_suit = "d"
-        elif card < 52:
+        elif card < 24:
             card_suit = "h"
 
         return card_num, card_suit
@@ -436,7 +440,7 @@ class Player():
 
 class Deck():
     def __init__(self):
-        self.cards = [x for x in range(52)]
+        self.cards = [x for x in range(maxCardCount)]
 
     def shuffle(self):
         random.shuffle(self.cards)
