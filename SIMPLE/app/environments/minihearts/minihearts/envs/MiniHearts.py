@@ -21,8 +21,10 @@ cards = {
 class MiniHeartsEnv(gym.Env):
     metadata = {'render.modes': ['human']}
     def __init__(self, verbose = False, manual = False):
+        super(MiniHeartsEnv, self).__init__()
         self.name = "minihearts"
         self.maxScore = maxScore
+        self.verbose = True
 
         self.n_players = 4
         self.current_player_num = 0
@@ -65,7 +67,7 @@ class MiniHeartsEnv(gym.Env):
         # get current trick values
         trick = np.array(self.current_trick)
         # one-hot encode the trick
-        trick_obs = np.zeros(maxCardCount)
+        trick_obs = np.full(maxCardCount, -1)
         for i, card in enumerate(trick):
             if card != -1:
                 trick_obs[card] = 1
@@ -75,7 +77,7 @@ class MiniHeartsEnv(gym.Env):
         # get player's hand
         player_id = self.current_player_num
         player_cards = np.full(numPlayerCards, -1)
-        player_cards_obs = np.zeros(maxCardCount)
+        player_cards_obs = np.full(maxCardCount, -1)
         for i, card in enumerate(self.players[player_id].hand):
             player_cards[i] = card
             player_cards_obs[card] = 1
@@ -88,13 +90,13 @@ class MiniHeartsEnv(gym.Env):
 
         # get player's position
         player_position = (player_id - self.trick_start_pos) % self.n_players
-        player_pos_obs = np.zeros(4)
+        player_pos_obs = np.full(4, -1)
         player_pos_obs[player_position] = 1
         ret = np.append(ret, player_pos_obs)
         
         # get remaining cards
         individuals_remaining_cards = []
-        remaining_cards_obs = np.zeros(maxCardCount)
+        remaining_cards_obs = np.full(maxCardCount, -1)
         for card in self.remaining_cards:
             if card not in player_cards:
                 individuals_remaining_cards.append(card)
@@ -205,8 +207,11 @@ class MiniHeartsEnv(gym.Env):
             #raise Exception(f"Invalid action: {action}, {self.players[player_id.hand]}")
             # handling illegal actions for evaluation callback
             logger.debug(f"Invalid action: {action}, {self.players[player_id].hand}")
-            reward = [player.score for player in self.players]
-            reward[self.current_player_num] = -1
+            # reward = [-0.01 * player.score for player in self.players]
+            # reward[self.current_player_num] = -1
+            # binary case
+            # scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
+            # reward[scores.index(min(scores))] = 1
             self.terminated = True
         else:
             
@@ -224,7 +229,7 @@ class MiniHeartsEnv(gym.Env):
             self.remaining_cards.remove(action)
 
             # give player reward for playing card
-            reward[player_id] = 0.01
+            reward[(player_id - 1) % self.n_players] = 0.01
 
             logger.debug(f"Played: {self.card_to_string(action)}")
 
@@ -279,8 +284,8 @@ class MiniHeartsEnv(gym.Env):
                     logger.debug(f"Total Tricks Played: {self.total_tricks}")
                     logger.debug(f"Total Rounds Played: {self.total_rounds}")
                     # handle reward (only binary case)
-                    #scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
-                    #reward[scores.index(min(scores))] = 1
+                    # scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
+                    # reward[scores.index(min(scores))] = 1
                 elif len(self.remaining_cards) == 0:
                     self.reset_round()
             else:
