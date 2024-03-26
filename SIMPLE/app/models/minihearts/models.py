@@ -11,9 +11,9 @@ from stable_baselines.common.distributions import CategoricalProbabilityDistribu
 
 ACTIONS = 6
 FEATURE_SIZE = 128
-DEPTH = 5
-VALUE_DEPTH = 4
-POLICY_DEPTH = 4
+DEPTH = 1
+VALUE_DEPTH = 10
+POLICY_DEPTH = 10
 
 class CustomPolicy(ActorCriticPolicy):
     def __init__(self, sess, ob_space, ac_space, n_env, n_steps, n_batch, reuse=False, **kwargs):

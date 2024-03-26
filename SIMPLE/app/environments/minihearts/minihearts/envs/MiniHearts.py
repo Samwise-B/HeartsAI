@@ -29,6 +29,7 @@ class MiniHeartsEnv(gym.Env):
         self.n_players = 4
         self.current_player_num = 0
         self.players = [Player(0), Player(1), Player(2), Player(3)]
+        self.agent_player_num = None
 
         # initialise observation space
         # self.observation_space = gym.spaces.Dict(
@@ -207,8 +208,8 @@ class MiniHeartsEnv(gym.Env):
             #raise Exception(f"Invalid action: {action}, {self.players[player_id.hand]}")
             # handling illegal actions for evaluation callback
             logger.debug(f"Invalid action: {action}, {self.players[player_id].hand}")
-            # reward = [-0.01 * player.score for player in self.players]
-            # reward[self.current_player_num] = -1
+            reward = [-0.01 * player.score + 0.01 * player.turns_taken for player in self.players]
+            reward[self.current_player_num] = -1
             # binary case
             # scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
             # reward[scores.index(min(scores))] = 1
@@ -228,8 +229,11 @@ class MiniHeartsEnv(gym.Env):
             # remove card from remaining cards list
             self.remaining_cards.remove(action)
 
+            self.players[player_id].turns_taken += 1
+            self.players[player_id].delta_turns += 1
+
             # give player reward for playing card
-            reward[(player_id - 1) % self.n_players] = 0.01
+            #reward[player_id] = 0.01
 
             logger.debug(f"Played: {self.card_to_string(action)}")
 
@@ -261,7 +265,8 @@ class MiniHeartsEnv(gym.Env):
 
                 # update score and current player
                 self.players[winner].score += trick_score
-                reward[winner] += -0.01 * trick_score
+                self.players[winner].delta_score += trick_score
+                #reward[winner] += -0.01 * trick_score
                 self.current_player_num = winner
                 self.trick_start_pos = winner
 
@@ -286,17 +291,38 @@ class MiniHeartsEnv(gym.Env):
                     # handle reward (only binary case)
                     # scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
                     # reward[scores.index(min(scores))] = 1
+                    # handle reward (terminal, non-binary case)
+                    reward = self.score_game()
                 elif len(self.remaining_cards) == 0:
                     self.reset_round()
             else:
                 # move to next player
                 self.current_player_num = (player_id - 1) % 4
 
+        # if self.current_player_num == self.agent_player_num:
+        #     reward = self.get_reward()
+
         #self.render()
 
         self.observation = self._get_obs()
             
         return self.observation, reward, self.terminated, False
+    
+    def score_game(self):
+        reward = [0] * self.n_players
+
+        for i, player in enumerate(self.players):
+            reward[i] = 0.01 * self.total_tricks - 0.01 * player.score
+
+        return reward
+    
+    def get_reward(self):
+        reward = [0] * self.n_players
+        for i, player in enumerate(self.players):
+            reward[i] = player.delta_turns * 0.01 - 0.01 * player.delta_score
+            player.delta_turns = 0
+            player.delta_score = 0
+        return reward
     
     def rules_move(self):
         player_id = self.current_player_num
@@ -433,7 +459,10 @@ class MiniHeartsEnv(gym.Env):
 class Player():
     def __init__(self, id):
         self.id = id
+        self.delta_score = 0
         self.score = 0
+        self.delta_turns = 0
+        self.turns_taken = 0
         self.hand = []
 
     def discard(self, card):
