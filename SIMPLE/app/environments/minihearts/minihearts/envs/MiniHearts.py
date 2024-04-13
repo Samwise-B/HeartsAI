@@ -61,7 +61,7 @@ class MiniHeartsEnv(gym.Env):
         self.trick_start_pos = 0
         self.total_rounds = 0
         self.total_tricks = 0
-        self.first_round_of_deal = True
+        self.first_trick_of_round = True
         self.hearts_broken = False
 
         self.terminated = False
@@ -106,13 +106,8 @@ class MiniHeartsEnv(gym.Env):
                 remaining_cards_obs[card] = 1
             
         ret = np.append(ret, remaining_cards_obs)
-        # return {
-        #     "current_trick": trick,
-        #     "player_cards": player_cards,
-        #     "player_scores": player_scores,
-        #     "player_position": player_position,
-        #     "remaining_cards": individuals_remaining_cards
-        # }
+
+        # append legal actions for masking
         legal_actions = self.legal_actions
         ret = np.append(ret, legal_actions)
         #print(ret.shape)
@@ -121,6 +116,7 @@ class MiniHeartsEnv(gym.Env):
         logger.debug(f"player_cards: {player_cards_obs}")
         logger.debug(f"player_position: {player_pos_obs}")
         logger.debug(f"remaining cards: {remaining_cards_obs}")
+        logger.debug(f"legal acts: {legal_actions}")
 
 
         return ret
@@ -130,20 +126,80 @@ class MiniHeartsEnv(gym.Env):
     
     @property
     def legal_actions(self):
-        legal_actions = np.zeros(numPlayerCards)
+        # legal_actions = np.zeros(numPlayerCards)
+        # legal_actions_first_trick = np.zeros(numPlayerCards)
         current_player = self.players[self.current_player_num]
         can_follow_suit = False
+        is_leading_trick = not self.current_trick_suit
+        # flag any card with the same suit as the current trick
+        # for i, card in enumerate(current_player.hand):
+        #     card_num, card_suit = self.format_card(card)
+        #     if card_suit == self.current_trick_suit:
+        #         legal_actions[i] = 1
+        #         can_follow_suit = True
+        # if not can_follow_suit:
+        #     # if player cant follow suit
+        #     for i, card in enumerate(current_player.hand):
+        #         card_num, card_suit = self.format(card)
+        #         if card != -1:
+        #             # handle start of round
+        #             non_scoring_card = card_suit != "h" and card != QofSpades
+        #             if self.first_trick_of_round and non_scoring_card:
+        #                 legal_actions_first_trick[i] = 1
+
+        #             # handle any cards case (not start of trick or hearts broken)
+        #             if not self.current_trick_suit or self.hearts_broken:
+        #                 legal_actions[i] = 1
+        #             else:
+        #                 # handle start of trick and hearts not broken case
+        #                 if card_suit != "h":
+        #                     legal_actions[i] = 1
+
+        legal_actions_any_card = np.zeros(numPlayerCards)
+        legal_actions_in_suit = np.zeros(numPlayerCards)
+        legal_actions_no_scoring_cards = np.zeros(numPlayerCards)
+        legal_actions_no_hearts = np.zeros(numPlayerCards)
+
         for i, card in enumerate(current_player.hand):
             card_num, card_suit = self.format_card(card)
+            # flag any card following suit
             if card_suit == self.current_trick_suit:
-                legal_actions[i] = 1
+                legal_actions_in_suit[i] = 1
                 can_follow_suit = True
-        if not can_follow_suit:
-            for i, card in enumerate(current_player.hand):
-                if card != -1:
-                    legal_actions[i] = 1
+            # handle cant follow suit cases
+            if card != -1:
+                # flag any unplayed card
+                legal_actions_any_card[i] = 1
 
-        return legal_actions
+                # flag non hearts cards
+                if card_suit != "h":
+                    legal_actions_no_hearts[i] = 1
+
+                    # no scoring cards
+                    if card != QofSpades:
+                        legal_actions_no_scoring_cards[i] = 1
+        # logger.debug(legal_actions_any_card)
+        # logger.debug(legal_actions_in_suit)
+        # logger.debug(legal_actions_no_hearts)
+        # logger.debug(legal_actions_no_scoring_cards)
+
+        if can_follow_suit:
+            return legal_actions_in_suit
+        else:
+            if self.first_trick_of_round and np.any(legal_actions_no_scoring_cards):
+                return legal_actions_no_scoring_cards
+            # elif self.first_trick_of_round:
+            #     return legal_actions_any_card
+            elif is_leading_trick and not self.hearts_broken:
+                if np.any(legal_actions_no_hearts):
+                    return legal_actions_no_hearts
+        return legal_actions_any_card
+            # else:
+            #     if is_starting_trick and not self.hearts_broken:
+            #         if np.any(legal_actions_no_hearts):
+            #             return legal_actions_no_hearts
+            #     else:
+            #         return legal_actions_any_card           
 
     def reset(self, seed=None):
         # following line to seed self.np_random
@@ -176,7 +232,6 @@ class MiniHeartsEnv(gym.Env):
         self.deck = Deck()
         self.deck.shuffle()
 
-        self.total_rounds += 1
         self.total_tricks += 1
 
         # reset remaining card tracker
@@ -185,6 +240,12 @@ class MiniHeartsEnv(gym.Env):
         # reset current trick
         for i, card in enumerate(self.current_trick):
             self.current_trick[i] = -1
+
+        # reset hearts_broken flag
+        self.hearts_broken = False
+
+        # reset first trick flag
+        self.first_trick_of_round = True
         
         for player in self.players:
             # deal player new hand
@@ -249,12 +310,21 @@ class MiniHeartsEnv(gym.Env):
             
             # handle trick end
             if (self.trick_start_pos + 1) % self.n_players == self.current_player_num:
+                # check if first trick of round
+                if self.first_trick_of_round:
+                    self.first_trick_of_round = False
+
                 # check who won the trick and update their score
                 trick_score = 0
                 max_card = 0
                 winner = None
                 for player_id, card in enumerate(self.current_trick):
                     card_num, card_suit = self.format_card(card)
+
+                    # check if hearts have been broken
+                    if card_suit == "h" and not self.hearts_broken:
+                        self.hearts_broken = True
+                        logger.debug("hearts broken!")
 
                     # find the winner of the trick
                     if card_suit == self.current_trick_suit and card_num >= max_card:
@@ -290,9 +360,10 @@ class MiniHeartsEnv(gym.Env):
                 # handle end of game and end of round
                 if self.players[winner].score >= maxScore:
                     self.terminated = True
-                    logger.debug(f"Total Tricks Played: {self.total_tricks}")
-                    logger.debug(f"Total Rounds Played: {self.total_rounds}")
-                    print(self.terminated)
+                    self.total_rounds += len(self.remaining_cards) / maxCardCount
+                    logger.log(f"Total Tricks Played: {self.total_tricks}")
+                    logger.log(f"Total Rounds Played: {self.total_rounds}")
+                    #print(self.terminated)
                     # handle reward (only binary case)
                     # scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
                     # reward[scores.index(min(scores))] = 1
@@ -300,6 +371,7 @@ class MiniHeartsEnv(gym.Env):
                     reward = self.score_game()
                 elif len(self.remaining_cards) == 0:
                     self.reset_round()
+                    self.total_rounds += 1
             else:
                 # move to next player
                 self.current_player_num = (player_id - 1) % 4
