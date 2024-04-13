@@ -60,7 +60,9 @@ class MiniHeartsEnv(gym.Env):
         self.current_trick_suit = None
         self.trick_start_pos = 0
         self.total_rounds = 0
-        self.total_tricks = 1
+        self.total_tricks = 0
+        self.first_round_of_deal = True
+        self.hearts_broken = False
 
         self.terminated = False
 
@@ -68,7 +70,7 @@ class MiniHeartsEnv(gym.Env):
         # get current trick values
         trick = np.array(self.current_trick)
         # one-hot encode the trick
-        trick_obs = np.full(maxCardCount, -1)
+        trick_obs = np.zeros(maxCardCount)
         for i, card in enumerate(trick):
             if card != -1:
                 trick_obs[card] = 1
@@ -78,7 +80,7 @@ class MiniHeartsEnv(gym.Env):
         # get player's hand
         player_id = self.current_player_num
         player_cards = np.full(numPlayerCards, -1)
-        player_cards_obs = np.full(maxCardCount, -1)
+        player_cards_obs = np.zeros(maxCardCount)
         for i, card in enumerate(self.players[player_id].hand):
             player_cards[i] = card
             player_cards_obs[card] = 1
@@ -90,14 +92,14 @@ class MiniHeartsEnv(gym.Env):
         #     player_scores[player.id] = player.score
 
         # get player's position
-        player_position = (player_id - self.trick_start_pos) % self.n_players
-        player_pos_obs = np.full(4, -1)
+        player_position = (self.trick_start_pos - player_id) % self.n_players
+        player_pos_obs = np.zeros(4)
         player_pos_obs[player_position] = 1
         ret = np.append(ret, player_pos_obs)
         
         # get remaining cards
         individuals_remaining_cards = []
-        remaining_cards_obs = np.full(maxCardCount, -1)
+        remaining_cards_obs = np.zeros(maxCardCount)
         for card in self.remaining_cards:
             if card not in player_cards:
                 individuals_remaining_cards.append(card)
@@ -114,6 +116,12 @@ class MiniHeartsEnv(gym.Env):
         legal_actions = self.legal_actions
         ret = np.append(ret, legal_actions)
         #print(ret.shape)
+        logger.debug(f"observations:")
+        logger.debug(f"trick: {trick_obs}")
+        logger.debug(f"player_cards: {player_cards_obs}")
+        logger.debug(f"player_position: {player_pos_obs}")
+        logger.debug(f"remaining cards: {remaining_cards_obs}")
+
 
         return ret
                 
@@ -145,7 +153,8 @@ class MiniHeartsEnv(gym.Env):
             # clear player hand and score
             player.reset()
 
-        self.total_rounds = 1
+        self.total_rounds = 0
+        self.total_tricks = 0
 
         # reset the round
         self.reset_round()
@@ -168,6 +177,7 @@ class MiniHeartsEnv(gym.Env):
         self.deck.shuffle()
 
         self.total_rounds += 1
+        self.total_tricks += 1
 
         # reset remaining card tracker
         self.remaining_cards = [x for x in range(maxCardCount)]
@@ -215,22 +225,16 @@ class MiniHeartsEnv(gym.Env):
             # reward[scores.index(min(scores))] = 1
             self.terminated = True
         else:
-            
-            #action = self.players[player_id].hand[action]
             # set action (index) to card
             action = self.players[player_id].hand[action]
             
             # add card to trick
             self.current_trick[player_id] = action
-            #print(self.current_trick)
-            #print(self.players[player_id].hand)
+
             # remove card from player's hand
             self.players[player_id].discard(action)
             # remove card from remaining cards list
             self.remaining_cards.remove(action)
-
-            self.players[player_id].turns_taken += 1
-            self.players[player_id].delta_turns += 1
 
             # give player reward for playing card
             #reward[player_id] = 0.01
@@ -265,10 +269,10 @@ class MiniHeartsEnv(gym.Env):
 
                 # update score and current player
                 self.players[winner].score += trick_score
-                self.players[winner].delta_score += trick_score
-                #reward[winner] += -0.01 * trick_score
                 self.current_player_num = winner
                 self.trick_start_pos = winner
+
+                #reward[winner] += -0.01 * trick_score
 
                 logger.debug(f"Player {winner} won the trick.")
 
@@ -288,6 +292,7 @@ class MiniHeartsEnv(gym.Env):
                     self.terminated = True
                     logger.debug(f"Total Tricks Played: {self.total_tricks}")
                     logger.debug(f"Total Rounds Played: {self.total_rounds}")
+                    print(self.terminated)
                     # handle reward (only binary case)
                     # scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
                     # reward[scores.index(min(scores))] = 1
@@ -298,10 +303,6 @@ class MiniHeartsEnv(gym.Env):
             else:
                 # move to next player
                 self.current_player_num = (player_id - 1) % 4
-
-        # if self.current_player_num == self.agent_player_num:
-        #     reward = self.get_reward()
-
         #self.render()
 
         self.observation = self._get_obs()
@@ -316,13 +317,13 @@ class MiniHeartsEnv(gym.Env):
 
         return reward
     
-    def get_reward(self):
-        reward = [0] * self.n_players
-        for i, player in enumerate(self.players):
-            reward[i] = player.delta_turns * 0.01 - 0.01 * player.delta_score
-            player.delta_turns = 0
-            player.delta_score = 0
-        return reward
+    # def get_reward(self):
+    #     reward = [0] * self.n_players
+    #     for i, player in enumerate(self.players):
+    #         reward[i] = player.delta_turns * 0.01 - 0.01 * player.delta_score
+    #         player.delta_turns = 0
+    #         player.delta_score = 0
+    #     return reward
     
     def rules_move(self):
         player_id = self.current_player_num
