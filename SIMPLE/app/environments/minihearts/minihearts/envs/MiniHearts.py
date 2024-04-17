@@ -361,8 +361,8 @@ class MiniHeartsEnv(gym.Env):
                 if self.players[winner].score >= maxScore:
                     self.terminated = True
                     self.total_rounds += len(self.remaining_cards) / maxCardCount
-                    logger.log(f"Total Tricks Played: {self.total_tricks}")
-                    logger.log(f"Total Rounds Played: {self.total_rounds}")
+                    logger.debug(f"Total Tricks Played: {self.total_tricks}")
+                    logger.debug(f"Total Rounds Played: {self.total_rounds}")
                     #print(self.terminated)
                     # handle reward (only binary case)
                     # scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
@@ -383,9 +383,17 @@ class MiniHeartsEnv(gym.Env):
     
     def score_game(self):
         reward = [0] * self.n_players
-
+        max_reward = -math.inf
+        min_reward = math.inf
         for i, player in enumerate(self.players):
-            reward[i] = 0.01 * self.total_tricks - 0.01 * player.score
+            reward[i] = (self.total_tricks - player.score)
+            if reward[i] > max_reward:
+                max_reward = reward[i]
+            if reward[i] < min_reward:
+                min_reward = reward[i]
+        
+        for i, player in enumerate(self.players):
+            reward[i] = (reward[i] - min_reward) / (max_reward - min_reward)
 
         return reward
     
