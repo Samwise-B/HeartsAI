@@ -63,7 +63,8 @@ def policy_head(y, legal_actions):
 
     for _ in range(POLICY_DEPTH):
         y = dense(y, FEATURE_SIZE)
-    policy = dense(y, ACTIONS, batch_norm = False, activation = None, name='pi')
+    y = dense(y, ACTIONS, batch_norm = True, activation = None, name='pi')
+    y = Activation("softmax")
     
     mask = Lambda(lambda x: (1 - x) * -1e8)(legal_actions)   
     
@@ -73,21 +74,22 @@ def policy_head(y, legal_actions):
 
 def resnet_extractor(y, **kwargs):
     y = dense(y, FEATURE_SIZE)
+    y = BatchNormalization(momentum=0.9)(y)
+    y = Activation('relu')(y)
+
     for _ in range(DEPTH):
         y = residual(y, FEATURE_SIZE)
 
     return y
 
-
-
-
-
 def residual(y, filters):
     shortcut = y
-
-    y = dense(y, filters)
+    y = dense(y, filters, activation=None)
+    y = BatchNormalization(momentum=0.9)(y)
+    y = Activation('relu')(y)
     y = dense(y, filters, activation = None)
     y = Add()([shortcut, y])
+    y = BatchNormalization(momentum=0.9)(y)
     y = Activation('relu')(y)
 
     return y

@@ -279,8 +279,11 @@ class MiniHeartsEnv(gym.Env):
             #raise Exception(f"Invalid action: {action}, {self.players[player_id.hand]}")
             # handling illegal actions for evaluation callback
             logger.debug(f"Invalid action: {action}, {self.players[player_id].hand}")
-            reward = [-0.01 * player.score + 0.01 * player.turns_taken for player in self.players]
-            reward[self.current_player_num] = -1
+            # reward = [-0.01 * player.score + 0.01 * player.turns_taken for player in self.players]
+            # reward[self.current_player_num] = -1
+
+            reward = [(24 - player.score) / 24 for player in self.players]
+            reward[self.current_player_num] = 0
             # binary case
             # scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
             # reward[scores.index(min(scores))] = 1
@@ -363,14 +366,15 @@ class MiniHeartsEnv(gym.Env):
                     self.total_rounds += len(self.remaining_cards) / maxCardCount
                     logger.debug(f"Total Tricks Played: {self.total_tricks}")
                     logger.debug(f"Total Rounds Played: {self.total_rounds}")
-                    #print(self.terminated)
                     # handle reward (only binary case)
                     # scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
                     # reward[scores.index(min(scores))] = 1
                     # handle reward (terminal, non-binary case)
                     reward = self.score_game()
                 elif len(self.remaining_cards) == 0:
-                    self.reset_round()
+                    self.terminated = True
+                    reward = self.score_game()
+                    #self.reset_round()
                     self.total_rounds += 1
             else:
                 # move to next player
@@ -391,9 +395,11 @@ class MiniHeartsEnv(gym.Env):
                 max_reward = reward[i]
             if reward[i] < min_reward:
                 min_reward = reward[i]
+            reward[i] = (24 - player.score) / 24
+            #reward[i] = self.total_tricks - player.score
         
-        for i, player in enumerate(self.players):
-            reward[i] = (reward[i] - min_reward) / (max_reward - min_reward)
+        # for i, player in enumerate(self.players):
+        #     reward[i] = (reward[i] - min_reward) / (max_reward - min_reward)
 
         return reward
     
