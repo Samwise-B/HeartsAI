@@ -10,6 +10,7 @@ maxCardCount = 24
 numPlayerCards = 6
 startingCard = 6
 QofSpades = 3
+QofSpadesValue = 6
 
 cards = {
     0: "2s", 1: "3s", 2: "4s", 3: "5s", 4: "6s", 5: "7s",
@@ -32,16 +33,6 @@ class MiniHeartsEnv(gym.Env):
         self.agent_player_num = None
 
         # initialise observation space
-        # self.observation_space = gym.spaces.Dict(
-        #     {
-        #         "current_trick": gym.spaces.Discrete(4),
-        #         "player_cards": gym.spaces.Discrete(13),
-        #         "player_scores": gym.spaces.Discrete(4),
-        #         "player_position": gym.spaces.Discrete(1),
-        #         "remaining_cards": gym.spaces.Discrete(52)
-        #     }
-        # )
-
         self.observation_space = gym.spaces.Box(-1, 1, (
             maxCardCount     # current trick
             + maxCardCount   # player's cards
@@ -54,7 +45,7 @@ class MiniHeartsEnv(gym.Env):
         # initialise action space
         self.action_space = gym.spaces.Discrete(numPlayerCards)
 
-        self.remaining_cards = [x for x in range(24)]
+        self.remaining_cards = [x for x in range(maxCardCount)]
 
         self.current_trick = [-1 for i in range(4)]
         self.current_trick_suit = None
@@ -126,34 +117,9 @@ class MiniHeartsEnv(gym.Env):
     
     @property
     def legal_actions(self):
-        # legal_actions = np.zeros(numPlayerCards)
-        # legal_actions_first_trick = np.zeros(numPlayerCards)
         current_player = self.players[self.current_player_num]
         can_follow_suit = False
         is_leading_trick = not self.current_trick_suit
-        # flag any card with the same suit as the current trick
-        # for i, card in enumerate(current_player.hand):
-        #     card_num, card_suit = self.format_card(card)
-        #     if card_suit == self.current_trick_suit:
-        #         legal_actions[i] = 1
-        #         can_follow_suit = True
-        # if not can_follow_suit:
-        #     # if player cant follow suit
-        #     for i, card in enumerate(current_player.hand):
-        #         card_num, card_suit = self.format(card)
-        #         if card != -1:
-        #             # handle start of round
-        #             non_scoring_card = card_suit != "h" and card != QofSpades
-        #             if self.first_trick_of_round and non_scoring_card:
-        #                 legal_actions_first_trick[i] = 1
-
-        #             # handle any cards case (not start of trick or hearts broken)
-        #             if not self.current_trick_suit or self.hearts_broken:
-        #                 legal_actions[i] = 1
-        #             else:
-        #                 # handle start of trick and hearts not broken case
-        #                 if card_suit != "h":
-        #                     legal_actions[i] = 1
 
         legal_actions_any_card = np.zeros(numPlayerCards)
         legal_actions_in_suit = np.zeros(numPlayerCards)
@@ -276,14 +242,19 @@ class MiniHeartsEnv(gym.Env):
         player_id = self.current_player_num
 
         if self.legal_actions[action] == 0:
-            #raise Exception(f"Invalid action: {action}, {self.players[player_id.hand]}")
             # handling illegal actions for evaluation callback
             logger.debug(f"Invalid action: {action}, {self.players[player_id].hand}")
             # reward = [-0.01 * player.score + 0.01 * player.turns_taken for player in self.players]
             # reward[self.current_player_num] = -1
 
-            reward = [(24 - player.score) / 24 for player in self.players]
+            # uncomment for single deal reward
+            reward = [(maxCardCount - player.score) / maxCardCount for player in self.players]
             reward[self.current_player_num] = 0
+
+            # reward = [self.total_tricks - player.score for player in self.players]
+            # reward[self.current_player_num] = 0
+            # reward = [1 for player in self.players]
+            # reward[self.current_player_num] = 0
             # binary case
             # scores = [self.players[0].score, self.players[1].score, self.players[2].score, self.players[3].score]
             # reward[scores.index(min(scores))] = 1
@@ -338,7 +309,7 @@ class MiniHeartsEnv(gym.Env):
                     if card_suit == "h":
                         trick_score += 1
                     elif card_suit == "s" and card_num == QofSpades:
-                        trick_score += 6
+                        trick_score += QofSpadesValue
 
                 # update score and current player
                 self.players[winner].score += trick_score
@@ -372,6 +343,7 @@ class MiniHeartsEnv(gym.Env):
                     # handle reward (terminal, non-binary case)
                     reward = self.score_game()
                 elif len(self.remaining_cards) == 0:
+                    # comment in to make environment run for a single deal and comment out reset_round
                     self.terminated = True
                     reward = self.score_game()
                     #self.reset_round()
@@ -390,80 +362,89 @@ class MiniHeartsEnv(gym.Env):
         max_reward = -math.inf
         min_reward = math.inf
         for i, player in enumerate(self.players):
-            reward[i] = (self.total_tricks - player.score)
-            if reward[i] > max_reward:
-                max_reward = reward[i]
-            if reward[i] < min_reward:
-                min_reward = reward[i]
-            reward[i] = (24 - player.score) / 24
-            #reward[i] = self.total_tricks - player.score
+            # reward[i] = self.total_tricks - player.score
+            # if reward[i] > max_reward:
+            #     max_reward = reward[i]
+            # if reward[i] < min_reward:
+            #     min_reward = reward[i]
+            reward[i] = (maxCardCount - player.score) / maxCardCount
         
         # for i, player in enumerate(self.players):
         #     reward[i] = (reward[i] - min_reward) / (max_reward - min_reward)
 
         return reward
     
-    # def get_reward(self):
-    #     reward = [0] * self.n_players
-    #     for i, player in enumerate(self.players):
-    #         reward[i] = player.delta_turns * 0.01 - 0.01 * player.delta_score
-    #         player.delta_turns = 0
-    #         player.delta_score = 0
-    #     return reward
-    
     def rules_move(self):
         player_id = self.current_player_num
+        # print(self.render_trick())
+        # print(self.render_player_hand())
+
         # handle non-leading tricks
         if self.trick_start_pos != player_id:
-            actions = []
+            # check if player can follow suit of the trick
+            # and if they have any non-scoring cards
+            can_follow_suit = False
+            has_non_scoring_card = False
             for i, card in enumerate(self.players[player_id].hand):
-                if card == -1:
-                    actions.append(0)
-                else:
-                    actions.append(1)
+                card_num, card_suit = self.format_card(card)
+                if card_suit == self.current_trick_suit:
+                    can_follow_suit = True
+                if card_suit != "h" and card != QofSpades:
+                    has_non_scoring_card = True
+
+            #print("has non scoring card:", has_non_scoring_card)
             
             # handle can play any card
-            if np.array_equal(self.legal_actions, actions):
+            if not can_follow_suit:
                 max_card = -1
                 max_card_ind = -1
                 max_heart_ind = -1
                 max_heart = -1
                 for i, card in enumerate(self.players[player_id].hand):
-                    if card == QofSpades:
+                    card_num, card_suit = self.format_card(card)
+                    if card == QofSpades and (not self.first_trick_of_round or self.first_trick_of_round and not has_non_scoring_card):
                         # if player has Qs, play it
                         return [1 if j == i else 0 for j in range(numPlayerCards)]
-                    elif card >= 18:
+                    elif card_suit == "h":
                         # if player has a heart, track highest heart
-                        if max_heart < card:
-                            max_heart = card
+                        if max_heart < card_num:
+                            max_heart = card_num
                             max_heart_ind = i
-                    elif card > max_card:
-                        max_card = card
+                    elif card_num > max_card and card != QofSpades:
+                        # track highest non-scoring card
+                        max_card = card_num
                         max_card_ind = i
                 # handle return array for max heart / card
-                if max_heart != -1:
+                if (not self.first_trick_of_round or self.first_trick_of_round and not has_non_scoring_card) and max_heart != -1:
                     return [1 if i == max_heart_ind else 0 for i in range(numPlayerCards)]
                 else:
                     return [1 if i == max_card_ind else 0 for i in range(numPlayerCards)]
             else:
-                suit_to_num = {"s":[0, 6], "c":[6, 12], "d":[12, 18], "h":[18, 24]}
-                lower, upper = suit_to_num[self.current_trick_suit]
-                max_trick_card = max(self.current_trick)
+                # handle, when player can follow suit
+                # get max card of the trick suit
+                max_trick_card = -1
+                for i, card in enumerate(self.current_trick):
+                    card_num, card_suit = self.format_card(card)
+                    if card_suit == self.current_trick and card_num > max_trick_card:
+                        max_trick_card = card_num
                 max_card = -1
                 max_card_i = -1
                 min_card = math.inf
                 min_card_i = math.inf
                 # handle following suit
                 for i, card in enumerate(self.players[player_id].hand):
-                    if card >= lower and card < upper:
-                    # if card is of the same suit
-                        if card > max_card and card < max_trick_card:
+                    card_num, card_suit = self.format_card(card)
+                    if card_suit == self.current_trick_suit:
+                        # if card is of the same suit
+                        if card_num > max_card and card_num < max_trick_card:
                             # update max card that is less than max_trick_card
-                            max_card = card
+                            max_card = card_num
                             max_card_i = i
-                        if card < min_card:
-                            min_card = card
+                        if card_num < min_card:
+                            min_card = card_num
                             min_card_i = i
+                # if player has a card less than the current max in the trick, play it
+                # otherwise, play the minimum card in the suit
                 if max_card_i != -1:
                     return [1 if i == max_card_i else 0 for i in range(numPlayerCards)]
                 else:
@@ -473,7 +454,7 @@ class MiniHeartsEnv(gym.Env):
             indexes = []
             # enumerate all indexes of hand which are unplayed cards
             for i, card in enumerate(self.players[player_id].hand):
-                if card != -1:
+                if self.legal_actions[i] == 1:
                     indexes.append(i)
             # get a random index
             i = indexes[random.randint(0, len(indexes)-1)]
@@ -523,15 +504,16 @@ class MiniHeartsEnv(gym.Env):
         if card == -1:
             return card, ""
         
-        card_num = card % 6
+        num_suit_cards = (maxCardCount / 4)
+        card_num = card % num_suit_cards
         card_suit = None
-        if card < 6:
+        if card < num_suit_cards:
             card_suit = "s"
-        elif card < 12:
+        elif card < num_suit_cards * 2:
             card_suit = "c"
-        elif card < 18:
+        elif card < num_suit_cards * 3:
             card_suit = "d"
-        elif card < 24:
+        elif card < num_suit_cards * 4:
             card_suit = "h"
 
         return card_num, card_suit
@@ -546,10 +528,7 @@ class MiniHeartsEnv(gym.Env):
 class Player():
     def __init__(self, id):
         self.id = id
-        self.delta_score = 0
         self.score = 0
-        self.delta_turns = 0
-        self.turns_taken = 0
         self.hand = []
 
     def discard(self, card):

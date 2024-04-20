@@ -15,13 +15,19 @@ SIMPLE/app/Dockerfile
 
 SIMPLE/app/environments/*
 !SIMPLE/app/environments/hearts/
+!SIMPLE/app/environments/minihearts/
 
 SIMPLE/app/zoo/*
 !SIMPLE/app/zoo/hearts
 !SIMPLE/app/zoo/hearts/*
+!SIMPLE/app/zoo/minihearts
+!SIMPLE/app/zoo/minihearts/*
 
 SIMPLE/app/zoo/hearts/_model_*.zip
+SIMPLE/app/zoo/minihearts/_model_*.zip
 
 SIMPLE/app/models/*
 !SIMPLE/app/models/hearts
 !SIMPLE/app/models/hearts/*
+!SIMPLE/app/models/minihearts
+!SIMPLE/app/models/minihearts/*

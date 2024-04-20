@@ -63,11 +63,8 @@ def policy_head(y, legal_actions):
 
     for _ in range(POLICY_DEPTH):
         y = dense(y, FEATURE_SIZE)
-    y = dense(y, ACTIONS, batch_norm = True, activation = None, name='pi')
-    y = Activation("softmax")
-    
-    mask = Lambda(lambda x: (1 - x) * -1e8)(legal_actions)   
-    
+    policy = dense(y, ACTIONS, batch_norm = False, activation = None, name='pi')
+    mask = Lambda(lambda x: (1 - x) * -1e8)(legal_actions)
     policy = Add()([policy, mask])
     return policy
 
@@ -88,9 +85,9 @@ def residual(y, filters):
     y = BatchNormalization(momentum=0.9)(y)
     y = Activation('relu')(y)
     y = dense(y, filters, activation = None)
-    y = Add()([shortcut, y])
     y = BatchNormalization(momentum=0.9)(y)
     y = Activation('relu')(y)
+    y = Add()([shortcut, y])
 
     return y
 
