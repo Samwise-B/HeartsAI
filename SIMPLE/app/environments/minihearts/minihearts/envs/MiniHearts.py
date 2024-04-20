@@ -36,7 +36,7 @@ class MiniHeartsEnv(gym.Env):
         self.observation_space = gym.spaces.Box(-1, 1, (
             maxCardCount     # current trick
             + maxCardCount   # player's cards
-            + 4              # player's position
+            + self.n_players              # player's position
             + maxCardCount   # remaining cards
             + numPlayerCards # legal actions
             , )
@@ -47,7 +47,7 @@ class MiniHeartsEnv(gym.Env):
 
         self.remaining_cards = [x for x in range(maxCardCount)]
 
-        self.current_trick = [-1 for i in range(4)]
+        self.current_trick = [-1 for i in range(self.n_players)]
         self.current_trick_suit = None
         self.trick_start_pos = 0
         self.total_rounds = 0
@@ -84,7 +84,7 @@ class MiniHeartsEnv(gym.Env):
 
         # get player's position
         player_position = (self.trick_start_pos - player_id) % self.n_players
-        player_pos_obs = np.zeros(4)
+        player_pos_obs = np.zeros(self.n_players)
         player_pos_obs[player_position] = 1
         ret = np.append(ret, player_pos_obs)
         
@@ -229,7 +229,7 @@ class MiniHeartsEnv(gym.Env):
                 self.remaining_cards.remove(startingCard)
 
                 # set current player to the left of player with 2 of clubs
-                self.current_player_num = (player.id - 1) % 4
+                self.current_player_num = (player.id - 1) % self.n_players
 
     def step(self, action):
         self.terminated = False
@@ -350,7 +350,7 @@ class MiniHeartsEnv(gym.Env):
                     self.total_rounds += 1
             else:
                 # move to next player
-                self.current_player_num = (player_id - 1) % 4
+                self.current_player_num = (player_id - 1) % self.n_players
         #self.render()
 
         self.observation = self._get_obs()
@@ -504,7 +504,7 @@ class MiniHeartsEnv(gym.Env):
         if card == -1:
             return card, ""
         
-        num_suit_cards = (maxCardCount / 4)
+        num_suit_cards = (maxCardCount / self.n_players)
         card_num = card % num_suit_cards
         card_suit = None
         if card < num_suit_cards:
