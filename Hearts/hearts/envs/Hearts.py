@@ -79,21 +79,39 @@ class HeartsEnv(gym.Env):
     def _get_info(self):
         return {}
     
+    # def legal_actions(self):
+    #     legal_actions = []
+    #     current_player = self.players[self.current_player_num]
+    #     can_follow_suit = False
+    #     for i, card in enumerate(current_player.hand):
+    #         card_num, card_suit = format_card(card)
+    #         if card_suit == self.current_trick_suit:
+    #             legal_actions.append(i)
+    #             can_follow_suit = True
+    #     if not can_follow_suit:
+    #         for i, card in enumerate(current_player.hand):
+    #             if card != -1:
+    #                 legal_actions.append(i)
+
+    #     return legal_actions
+    
     def legal_actions(self):
-        legal_actions = []
+        legal_actions = np.zeros(13)
         current_player = self.players[self.current_player_num]
         can_follow_suit = False
         for i, card in enumerate(current_player.hand):
             card_num, card_suit = format_card(card)
             if card_suit == self.current_trick_suit:
-                legal_actions.append(i)
+                legal_actions[i] = 1
                 can_follow_suit = True
         if not can_follow_suit:
             for i, card in enumerate(current_player.hand):
                 if card != -1:
-                    legal_actions.append(i)
+                    legal_actions[i] = 1
 
         return legal_actions
+        
+
 
     def reset(self, seed=None):
         # following line to seed self.np_random

@@ -1,0 +1,21 @@
+name: hearts--env-tests
+on: [push]
+jobs:
+    test-environment:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2
+            - name: Set up Python
+              uses: actions/setup-python@v2
+              with: 
+                    python-version: "3.7.x"
+            - name: Install Dependencies
+              run: |
+                python3 -m pip install --upgrade pip
+                pip install gym
+                pip install tensorflow==1.15.0
+                pip install stable-baselines
+                pip install protobuf==3.20.*
+                pip install numpy
+            - name: Run Tests
+              run: python3 "SIMPLE/app/environments/hearts/environment-test.py"
